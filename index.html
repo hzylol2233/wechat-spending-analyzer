@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="本地运行的大学校园消费记录分析工具，支持导入微信官方账单 CSV。"
+    />
+    <title>WeSpend - 校园消费分析器</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true">W</span>
+          <div>
+            <h1>WeSpend</h1>
+            <p>校园消费分析器</p>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <button class="button button-quiet" id="sampleButton" type="button">
+            加载示例账单
+          </button>
+          <label class="button button-primary" for="fileInput">
+            导入账单 CSV / PDF
+          </label>
+          <input id="fileInput" type="file" accept=".csv,.txt,.pdf" hidden />
+        </div>
+      </header>
+
+      <main>
+        <section class="source-bar" aria-label="数据来源状态">
+          <div class="source-info">
+            <span class="status-dot" aria-hidden="true"></span>
+            <div>
+              <strong id="sourceTitle">示例数据</strong>
+              <span id="sourceMeta">正在准备示例交易</span>
+            </div>
+          </div>
+          <div class="privacy-note">
+            <span>仅在本机浏览器处理</span>
+            <span class="privacy-divider" aria-hidden="true"></span>
+            <span>不上传账单</span>
+          </div>
+        </section>
+
+        <section class="filter-panel" aria-label="账单筛选">
+          <div class="filter-heading">
+            <div>
+              <p class="section-kicker">分析范围</p>
+              <h2>消费概览</h2>
+            </div>
+            <button class="text-button" id="resetFiltersButton" type="button">
+              清除筛选
+            </button>
+          </div>
+
+          <div class="filters">
+            <label>
+              <span>开始日期</span>
+              <input id="dateFromInput" type="date" />
+            </label>
+            <label>
+              <span>结束日期</span>
+              <input id="dateToInput" type="date" />
+            </label>
+            <label>
+              <span>收支类型</span>
+              <select id="flowFilter">
+                <option value="all">全部收支</option>
+                <option value="expense">只看支出</option>
+                <option value="income">只看收入</option>
+              </select>
+            </label>
+            <label>
+              <span>消费分类</span>
+              <select id="categoryFilter">
+                <option value="all">全部分类</option>
+              </select>
+            </label>
+            <label class="search-field">
+              <span>搜索商户或商品</span>
+              <input
+                id="searchInput"
+                type="search"
+                placeholder="例如：食堂、美团、打印"
+                autocomplete="off"
+              />
+            </label>
+          </div>
+          <div class="cleaning-strip" id="cleaningStrip" aria-label="账单清洗摘要"></div>
+        </section>
+
+        <section class="metric-grid" aria-label="核心指标">
+          <article class="metric-card metric-expense">
+            <span class="metric-label">总支出</span>
+            <strong id="totalExpense">¥0.00</strong>
+            <small id="expenseMeta">0 笔支出</small>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">总收入</span>
+            <strong id="totalIncome">¥0.00</strong>
+            <small id="incomeMeta">0 笔收入</small>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">净收支</span>
+            <strong id="netCashflow">¥0.00</strong>
+            <small id="netMeta">收入减支出</small>
+          </article>
+          <article class="metric-card">
+            <span class="metric-label">日均支出</span>
+            <strong id="dailyAverage">¥0.00</strong>
+            <small id="averageMeta">按筛选日期计算</small>
+          </article>
+        </section>
+
+        <section class="report-panel panel" aria-label="月度报告">
+          <div class="panel-heading report-heading">
+            <div>
+              <p class="section-kicker">月度总结</p>
+              <h3>真实月度报告</h3>
+            </div>
+            <div class="report-controls">
+              <label>
+                <span>报告月份</span>
+                <select id="reportMonthSelect"></select>
+              </label>
+              <button class="button button-quiet" id="printReportButton" type="button">
+                打印 / PDF
+              </button>
+              <button
+                class="button button-primary"
+                id="exportAnonymousReportButton"
+                type="button"
+              >
+                导出匿名报告
+              </button>
+            </div>
+          </div>
+          <div class="report-kpis" id="monthlyReportKpis"></div>
+          <div class="report-content" id="monthlyReportContent"></div>
+        </section>
+
+        <section class="dashboard-grid">
+          <article class="panel trend-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">时间变化</p>
+                <h3>支出趋势</h3>
+              </div>
+              <div class="legend">
+                <span><i class="legend-expense"></i>支出</span>
+                <span><i class="legend-income"></i>收入</span>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <svg
+                id="trendChart"
+                class="trend-chart"
+                viewBox="0 0 920 310"
+                role="img"
+                aria-label="支出与收入随时间的变化"
+              ></svg>
+            </div>
+          </article>
+
+          <article class="panel budget-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">预算控制</p>
+                <h3>本月预算</h3>
+              </div>
+            </div>
+            <div class="budget-content">
+              <div class="budget-ring" id="budgetRing">
+                <div>
+                  <strong id="budgetPercent">0%</strong>
+                  <span>已使用</span>
+                </div>
+              </div>
+              <div class="budget-summary">
+                <label for="budgetInput">月度预算</label>
+                <div class="money-input">
+                  <span>¥</span>
+                  <input
+                    id="budgetInput"
+                    type="number"
+                    min="0"
+                    step="100"
+                    value="1500"
+                    inputmode="decimal"
+                  />
+                </div>
+                <p id="budgetMessage">设置预算后显示提醒</p>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel category-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">支出结构</p>
+                <h3>消费分类</h3>
+              </div>
+              <span class="panel-note">按支出金额排序</span>
+            </div>
+            <div class="category-list" id="categoryList"></div>
+          </article>
+
+          <article class="panel heatmap-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">消费习惯</p>
+                <h3>星期与时段分布</h3>
+              </div>
+              <span class="panel-note">颜色越深，支出越高</span>
+            </div>
+            <div class="heatmap" id="heatmap"></div>
+          </article>
+
+          <article class="panel insight-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">自动观察</p>
+                <h3>账单洞察</h3>
+              </div>
+            </div>
+            <div class="insight-list" id="insightList"></div>
+          </article>
+
+          <article class="panel merchant-panel">
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">消费对象</p>
+                <h3>高频商户</h3>
+              </div>
+              <span class="panel-note">支出金额前五名</span>
+            </div>
+            <div class="merchant-list" id="merchantList"></div>
+          </article>
+        </section>
+
+        <section class="transactions-panel panel" aria-label="交易明细">
+          <div class="panel-heading transaction-heading">
+            <div>
+              <p class="section-kicker">账单明细</p>
+              <h3>交易记录</h3>
+            </div>
+            <div class="transaction-actions">
+              <span id="transactionCount">0 条记录</span>
+              <button class="button button-quiet" id="exportButton" type="button">
+                导出当前结果
+              </button>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">时间</th>
+                  <th scope="col">交易对方</th>
+                  <th scope="col">商品说明</th>
+                  <th scope="col">分类</th>
+                  <th scope="col">支付方式</th>
+                  <th scope="col">状态</th>
+                  <th scope="col" class="align-right">金额</th>
+                </tr>
+              </thead>
+              <tbody id="transactionBody"></tbody>
+            </table>
+          </div>
+          <div class="pagination">
+            <span id="pageInfo">第 1 / 1 页</span>
+            <div>
+              <button class="button button-quiet" id="prevPageButton" type="button">
+                上一页
+              </button>
+              <button class="button button-quiet" id="nextPageButton" type="button">
+                下一页
+              </button>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <script>
+      window.__wespendModule = window.module;
+      window.__wespendExports = window.exports;
+      window.__wespendDefine = window.define;
+      window.module = undefined;
+      window.exports = undefined;
+      window.define = undefined;
+    </script>
+    <script src="./vendors/pdfjs/pdf.min.js"></script>
+    <script>
+      window.pdfjsLib =
+        window.pdfjsLib || window["pdfjs-dist/build/pdf"] || undefined;
+      window.module = window.__wespendModule;
+      window.exports = window.__wespendExports;
+      window.define = window.__wespendDefine;
+      delete window.__wespendModule;
+      delete window.__wespendExports;
+      delete window.__wespendDefine;
+    </script>
+    <script>
+      if (window.pdfjsLib) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = "./vendors/pdfjs/pdf.worker.min.js";
+      }
+    </script>
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "wespend-campus-spending-analyzer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A local-first campus spending analyzer for WeChat bill exports.",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
